@@ -108,12 +108,32 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
     let longestSenderStreak = 0;
     let longestReceiverStreak = 0;
 
+    // --- ¡NUEVO! MÉTRICAS DE RELACIÓN Y SENTIMIENTO ---
+    let longestSilenceMs = 0;
+    const domainCounts = {};
+    
+    // Listas *muy* básicas de palabras para sentimiento.
+    const positiveWords = new Set(['gracias', 'bien', 'bueno', 'genial', 'excelente', 'gusta', 'encanta', 'amor', 'feliz', 'jaja', 'jajaja', 'xd', 'jiji', 'jeje', '👍', '❤️', '😂', '😊', '😍', '🎉']);
+    const negativeWords = new Set(['mal', 'triste', 'odio', 'terrible', 'horrible', 'asco', 'pena', ':(', '😭', '😠', '😡', '👎']);
+    
+    let senderSentiment = { positive: 0, negative: 0, neutral: 0 };
+    let receiverSentiment = { positive: 0, negative: 0, neutral: 0 };
+    let totalSentiment = { positive: 0, negative: 0, neutral: 0 };
+    // --- FIN DE NUEVAS VARIABLES ---
+
     messages.forEach(msg => {
-        // 1. Quién inicia
+        // 1. Quién inicia y "Ghosting" (Silencio más largo)
         if (lastMessageTime === null) {
             conversationStarters[msg.sender]++; // El primero inicia la primera
         } else {
             const diffMs = msg.timestamp.getTime() - lastMessageTime.getTime();
+            
+            // "Ghosting"
+            if (diffMs > longestSilenceMs) {
+                longestSilenceMs = diffMs;
+            }
+
+            // "Quién inicia"
             const diffHours = diffMs / (1000 * 60 * 60);
             if (diffHours > CONVERSATION_GAP_HOURS) {
                 conversationStarters[msg.sender]++;
@@ -138,7 +158,7 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
             lastReceiverTime = msg.timestamp;
         }
         
-        // 3. Rachas
+        // 3. Rachas (Insistente)
         if (msg.sender === currentStreakSender) {
             currentStreakCount++;
         } else {
@@ -151,11 +171,55 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
         } else {
             if (currentStreakCount > longestReceiverStreak) longestReceiverStreak = currentStreakCount;
         }
+
+        // 4. Top Links
+        msg.links.forEach(link => {
+            try {
+                // Extrae el "hostname" (ej: www.youtube.com)
+                const domain = new URL(link).hostname.replace(/^www\./, ''); // Quita 'www.'
+                domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+            } catch (e) { 
+                // Ignora si no es una URL válida
+            }
+        });
+
+        // 5. Sentimiento
+        if (!msg.isMultimedia) {
+            const contentLower = msg.content.toLowerCase();
+            let sentiment = 'neutral';
+
+            // Revisa si alguna palabra positiva está en el mensaje
+            for (const word of positiveWords) {
+                if (contentLower.includes(word)) {
+                    sentiment = 'positive';
+                    break;
+                }
+            }
+            
+            // Si no es positivo, revisa si es negativo
+            if (sentiment === 'neutral') {
+                for (const word of negativeWords) {
+                    if (contentLower.includes(word)) {
+                        sentiment = 'negative';
+                        break;
+                    }
+                }
+            }
+            
+            // Asigna el puntaje
+            if (msg.sender === selectedSender) {
+                senderSentiment[sentiment]++;
+            } else if (msg.sender === selectedReceiver) {
+                receiverSentiment[sentiment]++;
+            }
+            totalSentiment[sentiment]++;
+        }
     });
 
     const avgSenderResponse = senderResponseTimes.length ? (senderResponseTimes.reduce((a, b) => a + b, 0) / senderResponseTimes.length) : 0;
     const avgReceiverResponse = receiverResponseTimes.length ? (receiverResponseTimes.reduce((a, b) => a + b, 0) / receiverResponseTimes.length) : 0;
     
+    // Función de utilidad para formatear tiempo (usada para T. Respuesta y "Ghosting")
     const formatTime = (ms) => {
         if (ms === 0) return 'N/A';
         const seconds = Math.floor(ms / 1000);
@@ -169,6 +233,12 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
     };
     
     const conversationStarter = conversationStarters[selectedSender] >= conversationStarters[selectedReceiver] ? selectedSender : selectedReceiver;
+    
+    // ¡NUEVO! Datos para "Top Domains"
+    const topDomains = Object.entries(domainCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
 
     // --- OBJETO DE RETORNO ---
     return {
@@ -199,13 +269,14 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
         senderAvgLength: Math.round(senderAvgLength),
         receiverAvgLength: Math.round(receiverAvgLength),
         
-        // Interacción
+        // Interacción y Métricas de Relación
         avgSenderResponse: formatTime(avgSenderResponse),
         avgReceiverResponse: formatTime(avgReceiverResponse),
         conversationStarters,
         conversationStarter,
         longestSenderStreak,
         longestReceiverStreak,
+        longestSilence: formatTime(longestSilenceMs), // ¡NUEVO!
         
         // Datos para Gráficos
         topWords,
@@ -213,7 +284,14 @@ export function calculateStatistics(messages, selectedSender, selectedReceiver) 
         topEmojis,
         hourCounts,
         dayCounts: Object.entries(dayCounts).sort((a, b) => new Date(a[0].split('/').reverse().join('-')) - new Date(b[0].split('/').reverse().join('-'))),
-        dayActivityMatrix
+        dayActivityMatrix,
+        topDomains, // ¡NUEVO!
+
+        // Sentimiento
+        sentiment: { // ¡NUEVO!
+            total: totalSentiment,
+            sender: senderSentiment,
+            receiver: receiverSentiment
+        }
     };
 }
-
