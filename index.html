@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Chats</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Librerías de Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@latest/dist/chartjs-chart-matrix.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@latest/src/wordcloud2.js"></script>
+    
+    <!-- Librería para .zip -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    
+    <style>
+        /* Estilos para la Nube de Palabras */
+        #wordcloud-canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Estilos de Impresión */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .printable-area {
+                display: block !important;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border: none;
+            }
+            body {
+                background-color: #fff;
+            }
+            .grid, .grid-cols-1, .grid-cols-2 {
+                grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <!-- Contenedor principal de la App -->
+    <div id="app" class="min-h-screen">
+        <!-- El contenido se renderizará aquí -->
+    </div>
+
+    <!-- Script principal de la App -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
+
