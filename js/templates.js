@@ -303,9 +303,12 @@ export function renderChatView(messages, selectedSender, selectedReceiver) {
     `;
 }
 
+// 
+// --- ¡FUNCIÓN ACTUALIZADA! ---
+// 
 /**
  * Renderiza el HTML para la vista de estadísticas.
- * @param {object} stats - El objeto de estadísticas.
+ * @param {object} stats - El objeto de estadísticas de calculateStatistics.
  * @param {string} selectedSender - El remitente (tú).
  * @param {string} selectedReceiver - El destinatario.
  * @returns {string} HTML de la vista.
@@ -322,9 +325,7 @@ export function renderStatsView(stats, selectedSender, selectedReceiver) {
         `;
     }
 
-    // --- CÁLCULOS ADICIONALES ---
-    // El template antiguo esperaba datos que stats.js no provee.
-    // Los calculamos aquí para cerrar la brecha.
+    // --- CÁLCULOS ADICIONALES PARA LA VISTA ---
 
     // 1. Fecha del primer mensaje
     const firstMessageDate = stats.dayCounts.length > 0 ? stats.dayCounts[0][0] : 'N/A';
@@ -337,7 +338,7 @@ export function renderStatsView(stats, selectedSender, selectedReceiver) {
         percent: starterPercent
     };
 
-    // 3. Racha de mensajes más larga
+    // 3. Racha de mensajes más larga (El "Insistente")
     const longestTextStreak = stats.longestSenderStreak > stats.longestReceiverStreak ?
         { name: selectedSender, count: stats.longestSenderStreak } :
         { name: selectedReceiver, count: stats.longestReceiverStreak };
@@ -349,6 +350,12 @@ export function renderStatsView(stats, selectedSender, selectedReceiver) {
     // 5. Totales de multimedia por usuario
     const senderMediaTotal = Object.values(stats.senderMedia).reduce((a, b) => a + b, 0);
     const receiverMediaTotal = Object.values(stats.receiverMedia).reduce((a, b) => a + b, 0);
+
+    // 6. ¡NUEVO! Porcentajes de Sentimiento
+    const totalSent = stats.sentiment.total.positive + stats.sentiment.total.negative + stats.sentiment.total.neutral;
+    const sentPositivePercent = totalSent > 0 ? Math.round((stats.sentiment.total.positive / totalSent) * 100) : 0;
+    const sentNegativePercent = totalSent > 0 ? Math.round((stats.sentiment.total.negative / totalSent) * 100) : 0;
+    const sentNeutralPercent = 100 - sentPositivePercent - sentNegativePercent;
 
 
     return `
@@ -385,10 +392,15 @@ export function renderStatsView(stats, selectedSender, selectedReceiver) {
                         <p class="text-xl font-bold text-gray-900 truncate" title="${conversationStarterInfo.name}">${conversationStarterInfo.name}</p>
                         <p class="text-sm text-gray-600">${conversationStarterInfo.percent}% de las veces</p>
                     </div>
-                     <div class="bg-white rounded-xl shadow-lg p-5">
-                        <p class="text-gray-500 text-sm">Racha de Mensajes</p>
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <p class="text-gray-500 text-sm">El "Insistente"</p>
                         <p class="text-xl font-bold text-gray-900 truncate" title="${longestTextStreak.name}">${longestTextStreak.name}</p>
                         <p class="text-sm text-gray-600">${longestTextStreak.count} mensajes seguidos</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-5">
+                        <p class="text-gray-500 text-sm">Silencio más largo</p>
+                        <p class="text-2xl font-bold text-gray-900">${stats.longestSilence}</p>
+                        <p class="text-sm text-gray-600">(Ghosting)</p>
                     </div>
                 </div>
 
@@ -473,6 +485,52 @@ export function renderStatsView(stats, selectedSender, selectedReceiver) {
                             </div>
                     </div>
                 </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Vibras del Chat (Análisis de Sentimiento)</h3>
+                        <p class="text-sm text-gray-500 mb-3">Estimación de la positividad/negatividad de los mensajes.</p>
+                        <div class="w-full flex rounded-full h-6 overflow-hidden mb-4">
+                            <div class="bg-green-500" style="width: ${sentPositivePercent}%" title="Positivo"></div>
+                            <div class="bg-gray-400" style="width: ${sentNeutralPercent}%" title="Neutral"></div>
+                            <div class="bg-red-500" style="width: ${sentNegativePercent}%" title="Negativo"></div>
+                        </div>
+                        <div class="flex justify-between text-sm mb-4">
+                            <span class="font-semibold text-green-600">Positivo (${sentPositivePercent}%)</span>
+                            <span class="font-semibold text-gray-600">Neutral (${sentNeutralPercent}%)</span>
+                            <span class="font-semibold text-red-600">Negativo (${sentNegativePercent}%)</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                             <div>
+                                <p class="font-semibold mb-1">${selectedSender}</p>
+                                <p class="text-sm">😊 ${stats.sentiment.sender.positive} <span class="mx-1">|</span> 😐 ${stats.sentiment.sender.neutral} <span class="mx-1">|</span> 😠 ${stats.sentiment.sender.negative}</p>
+                             </div>
+                             <div>
+                                <p class="font-semibold mb-1">${selectedReceiver}</p>
+                                <p class="text-sm">😊 ${stats.sentiment.receiver.positive} <span class="mx-1">|</span> 😐 ${stats.sentiment.receiver.neutral} <span class="mx-1">|</span> 😠 ${stats.sentiment.receiver.negative}</p>
+                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">🔗 Top 5 Dominios Compartidos</h3>
+                        <div class="space-y-3">
+                            ${stats.topDomains.length > 0 ? stats.topDomains.map(([domain, count]) => `
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-medium text-blue-600 truncate" title="${domain}">${domain}</span>
+                                        <span class="text-gray-600">${count}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-blue-500 h-2 rounded-full" style="width: ${(count / stats.topDomains[0][1]) * 100}%"></div>
+                                    </div>
+                                </div>
+                            `).join('') : '<p class="text-gray-500 text-center mt-4">No se compartieron links en este chat.</p>'}
+                        </div>
+                    </div>
+                </div>
+
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-white rounded-xl shadow-lg p-6">
